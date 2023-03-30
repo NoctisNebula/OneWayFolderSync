@@ -54,17 +54,24 @@ while ($true) {
     $logStream.WriteLine("$(Get-Date): Starting folder synchronization...")  
 	
 
-    # Reading the files in replica folder and deleting those that don't exist in source folder then outputting to the terminal & logging the results
-    Get-ChildItem -Path $replicaFolder -Recurse -File | Where-Object {
-        $sourceFile = Join-Path $sourceFolder $_.FullName.Substring($replicaFolder.Length)
-        -not (Test-Path $sourceFile)
-    } | ForEach-Object {
-        $filename = $_.FullName
-        Remove-Item $filename
-        Write-Host "Deleted file $filename"
-        $logStream.WriteLine("$(Get-Date): Deleted file $filename")  		
-		
+# Reading the files from the source folder and copying to the replica folder if the case, or if the source file is newer, then outputting to the terminal & logging the results
+Get-ChildItem -Path $sourceFolder -Recurse -File | ForEach-Object {
+    $filename = $_.FullName
+    $destFilename = Join-Path $replicaFolder $_.FullName.Substring($sourceFolder.Length)
+    if (-not (Test-Path $destFilename)) {
+        Copy-Item $filename $destFilename
+        Write-Host "Copied file $filename to $destFilename"
+        $logStream.WriteLine("$(Get-Date): Copied file $filename to $destFilename") 
+    } else {
+        $sourceFileLastWriteTime = (Get-Item $filename).LastWriteTime
+        $destFileLastWriteTime = (Get-Item $destFilename).LastWriteTime
+        if ($sourceFileLastWriteTime -gt $destFileLastWriteTime) {
+            Copy-Item $filename $destFilename -Force
+            Write-Host "Updated file $filename in $destFilename"
+            $logStream.WriteLine("$(Get-Date): Updated file $filename in $destFilename") 
+        }
     }
+}
 
     # Reading the files from the source folder and copying to the replica folder if the case then outputting to the terminal & logging the results
     Get-ChildItem -Path $sourceFolder -Recurse -File | ForEach-Object {
